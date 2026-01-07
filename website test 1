@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MY ARTIST NAME</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --angle:0deg;
+    --pers:1200px;
+    --size:clamp(180px,22vw,280px);
+    --gap:320px;
+    --accent:#00ffe5;
+    --glow:#00ffe580;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#010409;font-family:'Segoe UI',Arial,sans-serif;color:#e6edf3}
+  body{display:flex;align-items:center;justify-content:center}
+
+  /* drifting starfield */
+  #stars{position:fixed;inset:0;z-index:-2;background:#010409}
+  .star{position:absolute;width:1.5px;height:1.5px;background:#e6edf3;border-radius:50%;animation:drift 120s linear infinite}
+  @keyframes drift{from{transform:translateY(0)}to{transform:translateY(-200vh)}}
+
+  /* title */
+  h1{position:absolute;top:4vh;font-size:clamp(2.2rem,5vw,4rem);letter-spacing:.12em;text-transform:uppercase;z-index:10;
+     background:linear-gradient(90deg,var(--accent),#fff);-webkit-background-clip:text;color:transparent}
+
+  /* 3-D carousel */
+  #carousel{position:relative;width:100%;height:50vh;perspective:var(--pers);transform-style:preserve-3d}
+  #wheel{position:absolute;left:50%;top:50%;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.25,1,.5,1)}
+  .album{position:absolute;width:var(--size);height:var(--size);left:calc(var(--size)/-2);top:calc(var(--size)/-2);
+         background:#000 center/cover no-repeat;border-radius:12px;cursor:pointer;transform-origin:center;
+         backface-visibility:hidden;transition:transform .6s,opacity .6s,box-shadow .6s;
+         box-shadow:0 10px 30px #000000aa}
+  .album::before{content:'';position:absolute;inset:0;border-radius:12px;
+                 border:2px solid transparent;transition:border-color .6s}
+  .album:hover{transform:translateY(-8px) scale(1.03)}
+  .album.active{transform:rotateY(calc(var(--angle) + var(--activeOffset,0deg))) translateZ(calc(var(--gap) + 140px)) scale(1.18);
+                box-shadow:0 0 20px 6px var(--glow)}
+  .album.active::before{border-color:var(--accent)}
+  /* dynamic positions for any count */
+  .album:nth-child(1){transform:rotateY(calc(var(--angle) + 0deg)) translateZ(var(--gap))}
+  .album:nth-child(2){transform:rotateY(calc(var(--angle) + 60deg)) translateZ(var(--gap))}
+  .album:nth-child(3){transform:rotateY(calc(var(--angle) + 120deg)) translateZ(var(--gap))}
+  .album:nth-child(4){transform:rotateY(calc(var(--angle) + 180deg)) translateZ(var(--gap))}
+  .album:nth-child(5){transform:rotateY(calc(var(--angle) + 240deg)) translateZ(var(--gap))}
+  .album:nth-child(6){transform:rotateY(calc(var(--angle) + 300deg)) translateZ(var(--gap))}
+
+  /* selected state: slide left & flip */
+  body.selection .album.inactive{opacity:.25;filter:blur(2px)}
+  body.selection .album.active{transform:translateX(-38vw) rotateY(-15deg) scale(1.15)}
+
+  /* tracklist panel */
+  #panel{position:fixed;right:0;top:50%;transform:translate(100%,-50%);
+         width:min(420px,88vw);background:#ffffff0d;border:1px solid #ffffff26;
+         backdrop-filter:blur(20px);padding:2rem;border-radius:16px 0 0 16px;
+         transition:transform .6s cubic-bezier(.25,1,.5,1);box-shadow:-10px 0 40px #000000aa}
+  #panel.show{transform:translate(0,-50%)}
+  #panel h2{margin-bottom:1.2rem;font-size:1.5rem;letter-spacing:.05em}
+  .track{margin:.9rem 0;display:flex;align-items:center;gap:.8rem}
+  .track span{flex:1;font-size:1rem}
+
+  /* stylized players */
+  .player{width:100%;height:48px;border-radius:8px;overflow:hidden;
+          background:linear-gradient(90deg,var(--accent) 0%, #ffffff22 90%);
+          border:none;position:relative}
+  .player::-webkit-media-controls-panel{background:transparent}
+  .player::-webkit-media-controls-enclosure{background:transparent}
+  /* progress glow */
+  .player::after{content:'';position:absolute;left:0;top:0;height:100%;
+                 width:0%;background:#fff6;transition:width .1s;pointer-events:none}
+  .player.playing::after{animation:grow linear forwards var(--duration)}
+  @keyframes grow{to{width:100%}}
+
+  /* controls */
+  #controls{position:absolute;bottom:7vh;display:flex;gap:1.2rem;z-index:10}
+  .ctrl{width:56px;height:56px;border-radius:50%;border:1px solid #ffffff33;
+        background:#ffffff0a;color:#e6edf3;font-size:1.8rem;cursor:pointer;
+        transition:background .25s,transform .1s;backdrop-filter:blur(4px)}
+  .ctrl:hover{background:#ffffff22}
+  .ctrl:active{transform:scale(.92)}
+  #hint{position:absolute;bottom:2vh;font-size:.8rem;opacity:.6}
+</style>
+</head>
+<body>
+
+<div id="stars"></div>
+<h1>MY ARTIST NAME</h1>
+
+<div id="carousel">
+  <div id="wheel"></div>
+</div>
+
+<div id="panel">
+  <h2 id="panelTitle"></h2>
+  <div id="tracklist"></div>
+</div>
+
+<div id="controls">
+  <button class="ctrl" id="leftBtn" title="◀">◀</button>
+  <button class="ctrl" id="rightBtn" title="▶">▶</button>
+</div>
+<div id="hint">Use ← → or buttons to spin • Enter to select</div>
+
+<script>
+/* ===== SAME RELEASES ARRAY AS BEFORE ===== */
+const releases = [
+  {
+    cover: "cover1.jpg",
+    title: "Neon Dreams",
+    tracks: [
+      {name:"Starlight",  file:"album1_track1.mp3"},
+      {name:"Velocity",   file:"album1_track2.mp3"},
+      {name:"Afterglow",  file:"album1_track3.mp3"}
+    ]
+  },
+  {
+    cover: "cover2.jpg",
+    title: "Lo-Fi Moon",
+    tracks: [
+      {name:"Crater",     file:"album2_track1.mp3"},
+      {name:"Tranquil",   file:"album2_track2.mp3"}
+    ]
+  },
+  {
+    cover: "cover3.jpg",
+    title: "Digital Rust",
+    tracks: [
+      {name:"Ghost",      file:"album3_track1.mp3"},
+      {name:"Decay",      file:"album3_track2.mp3"},
+      {name:"Reboot",     file:"album3_track3.mp3"}
+    ]
+  },
+  {
+    cover: "cover4.jpg",
+    title: "Singles",
+    tracks: [
+      {name:"Orbit",      file:"album4_track1.mp3"}
+    ]
+  },
+  {
+    cover: "cover5.jpg",
+    title: "Collabs",
+    tracks: [
+      {name:"With You",   file:"album5_track1.mp3"},
+      {name:"Gravity",    file:"album5_track2.mp3"}
+    ]
+  },
+  {
+    cover: "cover6.jpg",
+    title: "Scores",
+    tracks: [
+      {name:"Overture",   file:"album6_track1.mp3"},
+      {name:"Interlude",  file:"album6_track2.mp3"}
+    ]
+  }
+];
+/* ========================================= */
+
+const wheel   = document.getElementById('wheel');
+const panel   = document.getElementById('panel');
+const root    = document.documentElement;
+let index     = 0;
+const total   = releases.length;
+const angleStep = 360 / total;
+
+/* starfield */
+function createStars(){
+  const stars=document.getElementById('stars');
+  for(let i=0;i<150;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    s.style.left=Math.random()*100+'%';
+    s.style.top=Math.random()*200+'vh';
+    s.style.animationDelay=Math.random()*120+'s';
+    stars.appendChild(s);
+  }
+}
+
+/* build wheel */
+function buildWheel(){
+  releases.forEach((rel,i)=>{
+    const div=document.createElement('div');
+    div.className='album';
+    div.style.backgroundImage=`url(${rel.cover})`;
+    div.dataset.idx=i;
+    div.addEventListener('click',()=>selectAlbum(i));
+    wheel.appendChild(div);
+  });
+  selectAlbum(0);
+}
+
+/* color extractor mock (just use vibrant mid-tone) */
+function palette(url){
+  /* you could use a real extractor; here we fake it */
+  const colors=['#00ffe5','#ff00c1','#ffae42','#0aff99','#ae00ff','#00b3ff'];
+  return colors[index%colors.length];
+}
+
+/* select & animate */
+function selectAlbum(i){
+  index=i;
+  root.style.setProperty('--angle', `${-index*angleStep}deg`);
+  const accent=palette(releases[i].cover);
+  root.style.setProperty('--accent',accent);
+  root.style.setProperty('--glow',accent+'80');
+
+  wheel.querySelectorAll('.album').forEach((al,idx)=>{
+    al.classList.toggle('active',idx===i);
+    al.classList.toggle('inactive',idx!==i);
+  });
+  document.body.classList.add('selection');
+
+  /* panel content */
+  const rel=releases[i];
+  document.getElementById('panelTitle').textContent=rel.title;
+  const box=document.getElementById('tracklist');
+  box.innerHTML='';
+  rel.tracks.forEach(t=>{
+    const row=document.createElement('div');row.className='track';
+    row.innerHTML=`<span>${t.name}</span>
+                   <audio class="player" controls preload="none"><source src="${t.file}"></audio>`;
+    box.appendChild(row);
+  });
+  panel.classList.add('show');
+
+  /* progress glow hack */
+  document.querySelectorAll('.player').forEach(p=>{
+    p.addEventListener('play',()=>{
+      p.classList.add('playing');
+      const dur=p.duration||180; p.style.setProperty('--duration',dur+'s');
+    });
+    p.addEventListener('pause',()=>p.classList.remove('playing'));
+    p.addEventListener('ended',()=>p.classList.remove('playing'));
+  });
+}
+
+function move(dir){
+  index=(index+dir+total)%total;
+  selectAlbum(index);
+}
+
+/* controls */
+document.getElementById('leftBtn').onclick =()=> move(-1);
+document.getElementById('rightBtn').onclick=()=> move(1);
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft')  move(-1);
+  if(e.key==='ArrowRight') move(1);
+});
+
+createStars();
+buildWheel();
+</script>
+</body>
+</html>
